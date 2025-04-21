@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+service TurboMessage {
+  rpc RegisterUser(UserCredentials) returns (Response);
+  rpc Login(UserCredentials) returns (Response);
+  rpc SendMail(MailRequest) returns (Response);
+  rpc GetInbox(User) returns (MailList);
+  rpc GetOutbox(User) returns (MailList);
+  rpc ReadMail(MailId) returns (Mail);
+  rpc DeleteMail(MailId) returns (Response);
+}
+
+message UserCredentials {
+  string username = 1;
+  string password = 2;
+}
+
+message Response {
+  bool success = 1;
+  string message = 2;
+}
+
+message User {
+  string username = 1;
+}
+
+message Mail {
+  int32 id = 1;
+  string subject = 2;
+  string sender = 3;
+  string recipient = 4;
+  string body = 5;
+  bool read = 6;
+}
+
+message MailRequest {
+  string sender = 1;
+  string recipient = 2;
+  string subject = 3;
+  string body = 4;
+}
+
+message MailId {
+  string username = 1;
+  int32 id = 2;
+}
+
+message MailList {
+  repeated Mail mails = 1;
+}
