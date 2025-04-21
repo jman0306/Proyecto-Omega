@@ -1,0 +1,73 @@
+----------------------------------------------------------------------------------------------
+EJECUCIÓN  
+1. Iniciar el servidor
+    Abre una terminal y ejecuta: python servidor.py
+    Deberías ver: "Servidor TurboMessage corriendo en el puerto 50051..."
+
+2. Iniciar el cliente
+Abre otra terminal y ejecuta: python cliente.py
+
+----------------------------------------------------------------------------------------------
+USO DE CLIENTE
+Menú principal (sin sesión iniciada):
+--- TurboMessage ---
+1. Registrarse
+2. Iniciar sesión
+3. Salir
+
+    1. Registrarse
+    - Crea un nuevo usuario.
+    - Necesitas un username (único) y una contraseña.
+
+    2. Iniciar sesión
+    - Ingresa tus credenciales.
+    - Si son válidas, accedes al menú de usuario.
+
+Menú del Usuario (tras iniciar sesión):
+--- Menú del Usuario ---
+1. Enviar mensaje
+2. Ver bandeja de entrada
+3. Ver bandeja de salida
+4. Leer mensaje
+5. Borrar mensaje
+6. Cerrar sesión
+
+    1. Enviar mensaje
+    - Destinatario debe estar registrado.
+    - El sistema impide enviar si tu bandeja de salida o la bandeja de entrada del destinatario está llena (máximo 5 mensajes cada una).
+
+    2. Ver bandeja de entrada
+    - Lista todos los mensajes recibidos (máx. 5).
+    - Muestra el estado de lectura.
+
+    3. Ver bandeja de salida
+    - Lista todos los mensajes que has enviado.
+
+    4. Leer mensaje
+    - Ingresa el ID del mensaje para leerlo completo.
+    - El estado del mensaje se marca como leído solo cuando lo lee el receptor.
+
+    5. Borrar mensaje
+    - Ingresa el ID del mensaje que quieres eliminar.
+    - Puedes borrar mensajes de entrada o salida.
+    - La eliminación es permanente.
+
+    6. Cerrar sesión
+    - Vuelves al menú principal.
+
+----------------------------------------------------------------------------------------------
+ESTRUCTURA DE ARCHIVOS
+
+cliente.py	                                      Cliente de consola
+servidor.py	                                      Servidor gRPC
+turbo_message.proto	                              Definición del servicio
+turbo_message_pb2.py, turbo_message_pb2_grpc.py	  Archivos generados
+users.json                                        Base de datos de usuarios (persistencia)
+mails.json	                                      Base de datos de correos (persistencia)
+
+----------------------------------------------------------------------------------------------
+NOTAS TÉCNICAS
+
+- El servidor soporta múltiples clientes concurrentes.
+- No es necesario que el receptor esté conectado para recibir mensajes.
+- Los estados y contenidos son persistentes entre sesiones.
