@@ -1,6 +1,6 @@
 # Proyecto-Omega
 
-# 📧 TurboMessage
+# TurboMessage
 
 **TurboMessage** es un sistema distribuido de mensajería que simula un servidor de correos simplificado utilizando **gRPC** y **Protocol Buffers**. Permite a los usuarios registrarse, iniciar sesión, enviar, recibir, leer y eliminar correos electrónicos de manera persistente a través de una interfaz de consola.
 
