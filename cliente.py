@@ -35,11 +35,17 @@ def run():
                 choice = menu()
                 if choice == "1":
                     username, password = prompt_credentials()
-                    response = stub.RegisterUser(turbo_message_pb2.UserCredentials(username=username, password=password))
+                    response = stub.RegisterUser(turbo_message_pb2.UserCredentials(
+                        username=username,
+                        password=password
+                    ))
                     print(response.message)
                 elif choice == "2":
                     username, password = prompt_credentials()
-                    response = stub.Login(turbo_message_pb2.UserCredentials(username=username, password=password))
+                    response = stub.Login(turbo_message_pb2.UserCredentials(
+                        username=username,
+                        password=password
+                    ))
                     print(response.message)
                     if response.success:
                         logged_in = True
@@ -62,25 +68,46 @@ def run():
                         body=body
                     ))
                     print(response.message)
+
                 elif choice == "2":
                     mails = stub.GetInbox(turbo_message_pb2.User(username=current_user))
                     print("\n--- Bandeja de Entrada ---")
+                    if not mails.mails:
+                        print("Sin mensajes.")
                     for mail in mails.mails:
                         status = "Leído" if mail.read else "No leído"
                         print(f"ID: {mail.id} | De: {mail.sender} | Asunto: {mail.subject} | Estado: {status}")
+
                 elif choice == "3":
                     mails = stub.GetOutbox(turbo_message_pb2.User(username=current_user))
                     print("\n--- Bandeja de Salida ---")
+                    if not mails.mails:
+                        print("Sin mensajes.")
                     for mail in mails.mails:
                         print(f"ID: {mail.id} | Para: {mail.recipient} | Asunto: {mail.subject}")
+
                 elif choice == "4":
-                    mail_id = int(input("ID del mensaje a leer: "))
-                    mail = stub.ReadMail(turbo_message_pb2.MailId(username=current_user, id=mail_id))
-                    print(f"\nDe: {mail.sender}\nPara: {mail.recipient}\nAsunto: {mail.subject}\n\n{mail.body}")
+                    try:
+                        mail_id = int(input("ID del mensaje a leer: "))
+                        mail = stub.ReadMail(turbo_message_pb2.MailId(
+                            username=current_user,
+                            id=mail_id
+                        ))
+                        print(f"\n--- Mensaje ---\nDe: {mail.sender}\nPara: {mail.recipient}\nAsunto: {mail.subject}\n\n{mail.body}")
+                    except grpc.RpcError as e:
+                        print(f"Error: {e.details()}")
+
                 elif choice == "5":
-                    mail_id = int(input("ID del mensaje a borrar: "))
-                    response = stub.DeleteMail(turbo_message_pb2.MailId(username=current_user, id=mail_id))
-                    print(response.message)
+                    try:
+                        mail_id = int(input("ID del mensaje a borrar: "))
+                        response = stub.DeleteMail(turbo_message_pb2.MailId(
+                            username=current_user,
+                            id=mail_id
+                        ))
+                        print(response.message)
+                    except grpc.RpcError as e:
+                        print(f"Error: {e.details()}")
+
                 elif choice == "6":
                     logged_in = False
                     current_user = ""

@@ -8,10 +8,9 @@ from threading import Lock
 
 USERS_FILE = "users.json"
 MAILS_FILE = "mails.json"
-user_lock = Lock()
-mail_lock = Lock()
+user_mail_lock = Lock()  # Lock único para evitar condiciones de carrera
 
-# Inicializar almacenamiento si no existen
+# Inicializar archivos si no existen
 if not os.path.exists(USERS_FILE):
     with open(USERS_FILE, "w") as f:
         json.dump({}, f)
@@ -38,37 +37,45 @@ class TurboMessageServicer(turbo_message_pb2_grpc.TurboMessageServicer):
             json.dump(mails, f)
 
     def RegisterUser(self, request, context):
-        with user_lock:
+        with user_mail_lock:
             users = self.load_users()
             if request.username in users:
                 return turbo_message_pb2.Response(success=False, message="Usuario ya existe.")
             users[request.username] = {"password": request.password}
             self.save_users(users)
+
+            mails = self.load_mails()
+            mails[request.username] = {"inbox": {}, "sent": {}}
+            self.save_mails(mails)
+
             return turbo_message_pb2.Response(success=True, message="Registro exitoso.")
 
     def Login(self, request, context):
-        users = self.load_users()
-        if request.username in users and users[request.username]["password"] == request.password:
-            return turbo_message_pb2.Response(success=True, message="Inicio de sesión exitoso.")
-        return turbo_message_pb2.Response(success=False, message="Credenciales incorrectas.")
+        with user_mail_lock:
+            users = self.load_users()
+            if request.username in users and users[request.username]["password"] == request.password:
+                return turbo_message_pb2.Response(success=True, message="Inicio de sesión exitoso.")
+            return turbo_message_pb2.Response(success=False, message="Credenciales incorrectas.")
 
     def SendMail(self, request, context):
-        with mail_lock:
+        with user_mail_lock:
             mails = self.load_mails()
             users = self.load_users()
             if request.recipient not in users:
                 return turbo_message_pb2.Response(success=False, message="Receptor no existe.")
 
-            inbox = [m for m in mails.values() if m["recipient"] == request.recipient]
+            inbox = mails.get(request.recipient, {}).get("inbox", {})
             if len(inbox) >= 5:
                 return turbo_message_pb2.Response(success=False, message="Bandeja de entrada del receptor llena.")
 
-            outbox = [m for m in mails.values() if m["sender"] == request.sender]
+            outbox = mails.get(request.sender, {}).get("sent", {})
             if len(outbox) >= 5:
                 return turbo_message_pb2.Response(success=False, message="Tu bandeja de salida está llena.")
 
-            mail_id = str(max([int(k) for k in mails.keys()] + [0]) + 1)
-            mails[mail_id] = {
+            # Calcular nuevo ID
+            mail_id = str(max([int(k) for user in mails.values() for folder in user.values() for k in folder.keys()] + [0]) + 1)
+
+            new_mail = {
                 "id": int(mail_id),
                 "subject": request.subject,
                 "sender": request.sender,
@@ -76,41 +83,51 @@ class TurboMessageServicer(turbo_message_pb2_grpc.TurboMessageServicer):
                 "body": request.body,
                 "read": False
             }
+
+            mails[request.sender]["sent"][mail_id] = new_mail
+            mails[request.recipient]["inbox"][mail_id] = new_mail.copy()
             self.save_mails(mails)
+
             return turbo_message_pb2.Response(success=True, message="Correo enviado.")
 
     def GetInbox(self, request, context):
-        mails = self.load_mails()
-        inbox = [m for m in mails.values() if m["recipient"] == request.username]
-        return turbo_message_pb2.MailList(mails=[
-            turbo_message_pb2.Mail(**m) for m in inbox
-        ])
+        with user_mail_lock:
+            mails = self.load_mails()
+            inbox = mails.get(request.username, {}).get("inbox", {})
+            return turbo_message_pb2.MailList(mails=[
+                turbo_message_pb2.Mail(**m) for m in inbox.values()
+            ])
 
     def GetOutbox(self, request, context):
-        mails = self.load_mails()
-        outbox = [m for m in mails.values() if m["sender"] == request.username]
-        return turbo_message_pb2.MailList(mails=[
-            turbo_message_pb2.Mail(**m) for m in outbox
-        ])
+        with user_mail_lock:
+            mails = self.load_mails()
+            outbox = mails.get(request.username, {}).get("sent", {})
+            return turbo_message_pb2.MailList(mails=[
+                turbo_message_pb2.Mail(**m) for m in outbox.values()
+            ])
 
     def ReadMail(self, request, context):
-        with mail_lock:
+        with user_mail_lock:
             mails = self.load_mails()
-            mail = mails.get(str(request.id))
-            if not mail or (mail["sender"] != request.username and mail["recipient"] != request.username):
+            user_mails = mails.get(request.username, {}).get("inbox", {})
+            mail = user_mails.get(str(request.id))
+            if not mail:
                 context.abort(grpc.StatusCode.NOT_FOUND, "Correo no encontrado.")
-            if mail["recipient"] == request.username and not mail["read"]:
+            if not mail["read"]:
                 mail["read"] = True
                 self.save_mails(mails)
             return turbo_message_pb2.Mail(**mail)
 
     def DeleteMail(self, request, context):
-        with mail_lock:
+        with user_mail_lock:
             mails = self.load_mails()
-            mail = mails.get(str(request.id))
-            if not mail or (mail["sender"] != request.username and mail["recipient"] != request.username):
+            user_data = mails.get(request.username, {})
+            if str(request.id) in user_data.get("inbox", {}):
+                del user_data["inbox"][str(request.id)]
+            elif str(request.id) in user_data.get("sent", {}):
+                del user_data["sent"][str(request.id)]
+            else:
                 return turbo_message_pb2.Response(success=False, message="Correo no encontrado.")
-            del mails[str(request.id)]
             self.save_mails(mails)
             return turbo_message_pb2.Response(success=True, message="Correo borrado.")
 
